@@ -11,9 +11,8 @@ from markdownify import markdownify
 from bs4 import BeautifulSoup
 
 class LatexOCR(latex_ocr_pb2_grpc.LatexOCRServicer):
-    def __init__(self, model, cache_dir, device):
+    def __init__(self, device):
         self.device = device
-        self.cache_dir = cache_dir
         self.predictor = RecognitionPredictor()  # Initialize RecognitionPredictor directly
         print("Server started")
 
@@ -33,7 +32,7 @@ class LatexOCR(latex_ocr_pb2_grpc.LatexOCRServicer):
         return latex_ocr_pb2.ServerIsReadyReply(is_ready=True)  # Always ready since no async loading
 
     def GetConfig(self, request, context):
-        return latex_ocr_pb2.ServerConfig(device=str(self.device), cache_dir=self.cache_dir)
+        return latex_ocr_pb2.ServerConfig(device=str(self.device))
 
     def inference(self, image):
         tasks = [TaskNames.block_without_boxes]  # Task for processing the entire image
@@ -66,14 +65,14 @@ class LatexOCR(latex_ocr_pb2_grpc.LatexOCRServicer):
             latex = ""  # Handle case where no text lines are found
         return latex
 
-def serve(model_name: str, port: str, cache_dir: str, cpu: bool):
+def serve(port: str, cpu: bool):
     if not cpu and torch.cuda.is_available():
         device = torch.device("cuda:0")
     else:
         device = torch.device("cpu")
     print(f"Starting server on port {port}, using {device}")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    latex_ocr_pb2_grpc.add_LatexOCRServicer_to_server(LatexOCR(model_name, cache_dir, device), server)
+    latex_ocr_pb2_grpc.add_LatexOCRServicer_to_server(LatexOCR(device), server)
     server.add_insecure_port("[::]:" + port)
     server.start()
     server.wait_for_termination()
